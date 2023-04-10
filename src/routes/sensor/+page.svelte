@@ -6,7 +6,7 @@
 
 	async function goBack() {
 		if (unsavedData) {
-			if (!await confirm('You have unsaved data. Are you sure you want to leave?')) {
+			if (!(await confirm('You have unsaved data. Are you sure you want to leave?'))) {
 				return;
 			}
 			clearConfig();
