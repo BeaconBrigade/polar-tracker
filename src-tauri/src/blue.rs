@@ -1,4 +1,4 @@
-use std::time::{UNIX_EPOCH, SystemTime};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use arctic::{EventHandler, HeartRate, PmdRead, PolarSensor};
 use serde::Deserialize;
