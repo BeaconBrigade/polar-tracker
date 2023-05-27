@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { clearConfig, config, pageState } from '$lib/config';
+	import { invoke } from '@tauri-apps/api/tauri';
 
 	let unsavedData = false;
+    let measuring = false;
 
 	async function goBack() {
 		if (unsavedData) {
@@ -14,6 +16,12 @@
 		$pageState = 'connect';
 		await goto('/connect');
 	}
+
+    async function start() {
+        measuring = true;
+        await invoke('start_event_loop');
+        console.log("here");
+    }
 </script>
 
 <svelte:head>
@@ -23,6 +31,7 @@
 
 <div class="text-column">
 	<button on:click={goBack}>Back</button>
-	<p>What is up</p>
 	<pre>{JSON.stringify($config, null, 2)}</pre>
+
+    <button on:click={start} disabled={measuring}>Start Measurement</button>
 </div>

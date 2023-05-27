@@ -1,38 +1,19 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { pageState, setConfig } from '$lib/config';
-
-	let participantId: string;
-	let sessionNumber: number;
-	let trialId: number;
-	let description: string;
-	let measureHr = false;
-	let measureAcc = false;
-	let measureEcg = false;
-	let range: '2' | '4' | '8';
-	let rate: '25' | '50' | '100' | '200';
+	import { pageState, setConfig, config } from '$lib/config';
+	import { clearForm, formConfig } from '$lib/form';
+	import { invoke } from '@tauri-apps/api/tauri';
 
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
-		if (!(measureHr || measureAcc || measureEcg)) {
-			console.warn('choose either heartrate, acceleration or electrocardiagram to measure');
-			return;
-		}
 
-		let res = {
-			participantId,
-			sessionNumber,
-			trialId,
-			description,
-			measureHr,
-			measureAcc,
-			measureEcg,
-			range,
-			rate
-		};
-
-		setConfig(res);
-
+		setConfig($formConfig);
+        let temp = $formConfig;
+        temp.rate = +$formConfig.rate;
+        temp.range = +$formConfig.range;
+        console.log(JSON.stringify(temp, null, 2));
+		await invoke('set_config', { config: temp });
+		clearForm();
 		$pageState = 'connect';
 		await goto('/connect');
 	}
@@ -49,42 +30,27 @@
 	<form on:submit={handleSubmit}>
 		<fieldset>
 			<label for="participant">Participant ID</label>
-			<input id="participant" type="text" required bind:value={participantId} />
+			<input id="participant" type="text" required bind:value={$formConfig.participantId} />
 		</fieldset>
 
 		<fieldset>
 			<label for="session">Session Number</label>
-			<input id="session" type="number" required bind:value={sessionNumber} />
+			<input id="session" type="number" required bind:value={$formConfig.sessionNumber} />
 		</fieldset>
 
 		<fieldset>
 			<label for="trial">Trial ID</label>
-			<input id="trial" type="number" required bind:value={trialId} />
+			<input id="trial" type="number" required bind:value={$formConfig.trialId} />
 		</fieldset>
 
 		<fieldset>
 			<label for="description">Description</label>
-			<input id="description" type="text" required bind:value={description} />
-		</fieldset>
-
-		<fieldset>
-			<label for="heart-rate">Measure Heart Rate</label>
-			<input id="heart-rate" type="checkbox" bind:checked={measureHr} />
-		</fieldset>
-
-		<fieldset>
-			<label for="acceleration">Measure Acceleration</label>
-			<input id="acceleration" type="checkbox" bind:checked={measureAcc} />
-		</fieldset>
-
-		<fieldset>
-			<label for="ecg">Measure ECG</label>
-			<input id="ecg" type="checkbox" bind:checked={measureEcg} />
+			<input id="description" type="text" required bind:value={$formConfig.description} />
 		</fieldset>
 
 		<fieldset>
 			<label for="range">Select range to measure acceleration</label>
-			<select id="range" bind:value={range}>
+			<select id="range" bind:value={$formConfig.range}>
 				<option value="8">8 Gs</option>
 				<option value="4">4 Gs</option>
 				<option value="2">2 Gs</option>
@@ -93,7 +59,7 @@
 
 		<fieldset>
 			<label for="rate">Select sample rate for acceleration</label>
-			<select id="rate" bind:value={rate}>
+			<select id="rate" bind:value={$formConfig.rate}>
 				<option value="200">200 hz</option>
 				<option value="100">100 hz</option>
 				<option value="50">50 hz</option>

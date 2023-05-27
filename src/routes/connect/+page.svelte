@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { clearConfig, config, pageState } from '$lib/config';
+	import { invoke } from '@tauri-apps/api/tauri';
 
 	let deviceId = '';
 	let connected = false;
+    let isConnectionInProgress = false;
 	$: unsavedData = deviceId !== '';
 
 	async function goBack() {
@@ -28,7 +30,13 @@
 	}
 
 	async function connect() {
-		alert('connecting');
+        // don't block on future until updating ui state
+        isConnectionInProgress = true;
+		let res =  invoke('connect', { deviceId: deviceId });
+		alert('Connecting');
+
+        await res;
+        isConnectionInProgress = false;
 		connected = true;
 	}
 
@@ -66,7 +74,7 @@
 	{#if connected}
 		<button on:click={disconnect}>Disconnect</button>
 	{:else}
-		<button on:click={connect}>Connect</button>
+		<button on:click={connect} disabled={isConnectionInProgress}>Connect</button>
 	{/if}
 	<button on:click={next} disabled={!connected}>Next</button>
 </div>

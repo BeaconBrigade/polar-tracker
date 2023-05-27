@@ -5,9 +5,6 @@ export type Config = {
 	sessionNumber: number;
 	trialId: number;
 	description: string;
-	measureHr: boolean;
-	measureAcc: boolean;
-	measureEcg: boolean;
 	range: '2' | '4' | '8';
 	rate: '25' | '50' | '100' | '200';
 };
