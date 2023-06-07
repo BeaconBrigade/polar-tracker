@@ -39,7 +39,7 @@
 	</nav>
 
 	<div class="corner">
-		<a href="https://github.com/sveltejs/kit">
+		<a href="https://github.com/beaconbrigade/polar-tracker">
 			<img src={github} alt="GitHub" />
 		</a>
 	</div>

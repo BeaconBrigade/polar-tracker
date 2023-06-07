@@ -63,6 +63,7 @@
 	<input
 		id="device-id"
 		type="text"
+        placeholder="Device ID"
 		autocorrect="off"
 		autocomplete="off"
 		spellcheck="false"

@@ -5,11 +5,11 @@
 
 mod blue;
 
-use std::{env, fs::OpenOptions};
+use std::{env, fs::OpenOptions, path::PathBuf};
 
 use arctic::v2::{EventLoop, EventType, PolarHandle, PolarSensor};
 use serde::Serialize;
-use tauri::State;
+use tauri::{api::dialog, CustomMenuItem, Menu, MenuItem, State, Submenu};
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tracing::instrument;
@@ -17,16 +17,77 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 use crate::blue::{Config, Handler};
 
+pub static HR_PATH: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+pub static ACC_PATH: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+pub static ECG_PATH: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
 fn main() {
+    let file_menu = Submenu::new(
+        "File",
+        Menu::new()
+            .add_submenu(Submenu::new(
+                "Export",
+                Menu::new()
+                    .add_item(CustomMenuItem::new("hr".to_string(), "Heart Rate Data"))
+                    .add_item(CustomMenuItem::new("acc".to_string(), "Acceleration Data"))
+                    .add_item(CustomMenuItem::new("ecg".to_string(), "ECG Data")),
+            ))
+            .add_native_item(MenuItem::Separator)
+            .add_native_item(MenuItem::Quit),
+    );
+    let menu = Menu::new().add_submenu(file_menu);
     tauri::Builder::default()
+        .menu(menu)
         .manage(Mutex::new(AppState::new()))
+        .on_menu_event(|e| match e.menu_item_id() {
+            name @ ("acc" | "ecg" | "hr") => {
+                let name = name.to_string();
+                dialog::FileDialogBuilder::default()
+                    .set_file_name(&format!("{name}.csv"))
+                    .save_file(move |p| {
+                        let Some(dest) = p else {
+                            return;
+                        };
+                        tracing::info!("saving {name} to {}", dest.to_string_lossy());
+                        let src_path = match name.as_str() {
+                            "acc" => {
+                                let Some(p) = ACC_PATH.lock().unwrap().clone() else {
+                                    return;
+                                };
+                                p
+                            },
+                            "ecg" => {
+                                let Some(p) = ECG_PATH.lock().unwrap().clone() else {
+                                    return;
+                                };
+                                p
+                            },
+                            "hr" => {
+                                let Some(p) = HR_PATH.lock().unwrap().clone() else {
+                                    return;
+                                };
+                                p
+                            },
+                            _ => unreachable!(),
+                        };
+
+                        if let Err(e) = std::fs::copy(src_path, dest) {
+                            tracing::error!("couldn't copy {name} file: {e}");
+                        }
+                    })
+            }
+            _ => {}
+        })
         .setup(|app| {
-            if env::args().nth(1).map(|a| a != "--print-logs").unwrap_or(true) {
+            if env::args()
+                .nth(1)
+                .map(|a| a != "--print-logs")
+                .unwrap_or(true)
+            {
                 let log_dir = app.path_resolver().app_log_dir().unwrap();
                 let _ = std::fs::create_dir_all(&log_dir);
 
                 let log_path = log_dir.join("polar-tracker.log");
-                println!("path: {}", log_path.to_str().unwrap());
                 tracing_subscriber::registry()
                     .with(
                         EnvFilter::try_from_default_env()
@@ -57,6 +118,7 @@ fn main() {
             set_config,
             connect,
             disconnect,
+            stop_event_loop,
             start_event_loop
         ])
         .run(tauri::generate_context!())
@@ -129,7 +191,23 @@ async fn disconnect(state: State<'_, Mutex<AppState>>) -> Result<(), AppError> {
 
 #[tauri::command]
 #[instrument(skip_all)]
-async fn start_event_loop(app: tauri::AppHandle, state: State<'_, Mutex<AppState>>) -> Result<(), AppError> {
+async fn stop_event_loop(state: State<'_, Mutex<AppState>>) -> Result<(), AppError> {
+    tracing::info!("stopping measurement");
+    let mut lock = state.lock().await;
+    let Some(handle) = lock.handle.take() else {
+        return Err(AppError::MissingHandler);
+    };
+    handle.stop().await;
+
+    Ok(())
+}
+
+#[tauri::command]
+#[instrument(skip_all)]
+async fn start_event_loop(
+    app: tauri::AppHandle,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<(), AppError> {
     tracing::info!("starting event loop");
     let mut lock = state.lock().await;
     let Some(sensor) = lock.sensor.take() else {
@@ -141,9 +219,8 @@ async fn start_event_loop(app: tauri::AppHandle, state: State<'_, Mutex<AppState
         return Err(AppError::MissingConfig);
     };
 
-    tracing::info!("made it here1");
-    let handle = sensor.event_loop(Handler::new(config, &app.path_resolver()).await?).await;
-    tracing::info!("made it here");
+    let handler = Handler::new(config, &app.path_resolver()).await?;
+    let handle = sensor.event_loop(handler).await;
     lock.handle = Some(handle);
 
     Ok(())

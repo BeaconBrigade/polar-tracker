@@ -1,6 +1,9 @@
 use std::{
     path::PathBuf,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -12,7 +15,7 @@ use chrono::Utc;
 use serde::Deserialize;
 use tauri::{async_runtime::Mutex, PathResolver};
 use tokio::{
-    fs::{File, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::{self, AsyncWriteExt, BufWriter},
 };
 
@@ -22,10 +25,10 @@ use crate::AppError;
 pub struct Handler {
     /// datetime of start so cache files are unique between runs
     pub prefix: String,
-    hr_writer: Mutex<BufWriter<File>>,
+    hr_writer: Arc<Mutex<BufWriter<File>>>,
     hr_count: AtomicUsize,
-    acc_writer: Mutex<BufWriter<File>>,
-    ecg_writer: Mutex<BufWriter<File>>,
+    acc_writer: Arc<Mutex<BufWriter<File>>>,
+    ecg_writer: Arc<Mutex<BufWriter<File>>>,
 }
 
 impl Handler {
@@ -37,8 +40,22 @@ impl Handler {
             .unwrap()
             .as_secs()
             .to_string();
+        tracing::info!(
+            "saving data to {}",
+            path_resolver.app_data_dir().unwrap().to_string_lossy(),
+        );
+        fs::create_dir_all(path_resolver.app_data_dir().unwrap()).await?;
+        tracing::debug!("prefix is {prefix_path}");
         let hr_writer = {
-            let path = path(path_resolver.app_data_dir().unwrap(), &prefix_path, EventType::Hr);
+            let path = path(
+                path_resolver.app_data_dir().unwrap(),
+                &prefix_path,
+                EventType::Hr,
+            );
+            {
+                let mut lock = crate::HR_PATH.lock().unwrap();
+                *lock = Some(path.clone());
+            }
             tracing::debug!("made path: {path:?}");
             let mut file = OpenOptions::new()
                 .write(true)
@@ -47,12 +64,22 @@ impl Handler {
                 .await?;
             write_metadata(config, &mut file).await?;
             write_headers(EventType::Hr, &mut file).await?;
-            let buf = BufWriter::new(file);
-            Mutex::new(buf)
+            // smaller buffer because there's more infrequent
+            // data.
+            let buf = BufWriter::with_capacity(256, file);
+            Arc::new(Mutex::new(buf))
         };
-        tracing::info!("made hr writer");
         let acc_writer = {
-            let path = path(path_resolver.app_data_dir().unwrap(), &prefix_path, EventType::Acc);
+            let path = path(
+                path_resolver.app_data_dir().unwrap(),
+                &prefix_path,
+                EventType::Acc,
+            );
+            {
+                let mut lock = crate::ACC_PATH.lock().unwrap();
+                *lock = Some(path.clone());
+            }
+            tracing::debug!("made path: {path:?}");
             let mut file = OpenOptions::new()
                 .write(true)
                 .create(true)
@@ -61,10 +88,19 @@ impl Handler {
             write_metadata(config, &mut file).await?;
             write_headers(EventType::Acc, &mut file).await?;
             let buf = BufWriter::new(file);
-            Mutex::new(buf)
+            Arc::new(Mutex::new(buf))
         };
         let ecg_writer = {
-            let path = path(path_resolver.app_data_dir().unwrap(), &prefix_path, EventType::Ecg);
+            let path = path(
+                path_resolver.app_data_dir().unwrap(),
+                &prefix_path,
+                EventType::Ecg,
+            );
+            {
+                let mut lock = crate::ECG_PATH.lock().unwrap();
+                *lock = Some(path.clone());
+            }
+            tracing::debug!("made path: {path:?}");
             let mut file = OpenOptions::new()
                 .write(true)
                 .create(true)
@@ -73,7 +109,7 @@ impl Handler {
             write_metadata(config, &mut file).await?;
             write_headers(EventType::Ecg, &mut file).await?;
             let buf = BufWriter::new(file);
-            Mutex::new(buf)
+            Arc::new(Mutex::new(buf))
         };
         let me = Self {
             prefix: prefix_path,
@@ -101,30 +137,22 @@ fn path(base: PathBuf, prefix: &str, ty: EventType) -> PathBuf {
 #[arctic::async_trait]
 impl EventHandler for Handler {
     async fn heart_rate_update(&self, heartrate: HeartRate) {
-        tracing::debug!(bpm=heartrate.bpm(), rr=?heartrate.rr());
+        tracing::trace!(bpm=heartrate.bpm(), rr=?heartrate.rr());
         let mut rr = String::new();
         for r in heartrate.rr().into_iter().flatten() {
             rr.push_str(format!(",{}", r).as_str());
         }
+        let count = self.hr_count.fetch_add(1, Ordering::AcqRel);
         self.hr_writer
             .lock()
             .await
-            .write_all(
-                format!(
-                    "{},{}{}\n",
-                    self.hr_count.load(Ordering::Acquire),
-                    heartrate.bpm(),
-                    rr
-                )
-                .as_bytes(),
-            )
+            .write_all(format!("{},{}{}\n", count, heartrate.bpm(), rr).as_bytes())
             .await
             .unwrap();
-        self.hr_count.fetch_add(1, Ordering::AcqRel);
     }
 
     async fn measurement_update(&self, data: PmdRead) {
-        tracing::debug!(?data);
+        tracing::trace!(?data);
         let timestamp = data.time_stamp();
         for point in data.data() {
             let (mut writer, message) = match point {
@@ -146,6 +174,27 @@ impl EventHandler for Handler {
 
             writer.write_all(message.as_bytes()).await.unwrap();
         }
+    }
+}
+
+impl Drop for Handler {
+    fn drop(&mut self) {
+        tracing::info!("flushing handler writers");
+        let hr_writer = Arc::clone(&self.hr_writer);
+        let acc_writer = Arc::clone(&self.acc_writer);
+        let ecg_writer = Arc::clone(&self.ecg_writer);
+
+        tokio::task::spawn(async move {
+            if let Err(e) = hr_writer.lock().await.flush().await {
+                tracing::error!("couldn't flush hr writer: {e}");
+            };
+            if let Err(e) = acc_writer.lock().await.flush().await {
+                tracing::error!("couldn't flush acc writer: {e}");
+            };
+            if let Err(e) = ecg_writer.lock().await.flush().await {
+                tracing::error!("couldn't flush ecg writer: {e}");
+            };
+        });
     }
 }
 
