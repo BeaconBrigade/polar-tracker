@@ -43,7 +43,7 @@
 <div class="text-column">
 	<button on:click={goBack}>Back</button>
 
-    <p>Head to <b>polar-tracker → File → Export</b> to save your data.</p>
+	<p>Head to <b>polar-tracker → File → Export</b> to save your data.</p>
 
 	<button on:click={start} disabled={measuring}>Start Measurement</button>
 	<button on:click={stop} disabled={!measuring}>Stop Measurement</button>

@@ -5,7 +5,7 @@
 
 	let deviceId = '';
 	let connected = false;
-    let isConnectionInProgress = false;
+	let isConnectionInProgress = false;
 	$: unsavedData = deviceId !== '';
 
 	async function goBack() {
@@ -30,13 +30,13 @@
 	}
 
 	async function connect() {
-        // don't block on future until updating ui state
-        isConnectionInProgress = true;
-		let res =  invoke('connect', { deviceId: deviceId });
+		// don't block on future until updating ui state
+		isConnectionInProgress = true;
+		let res = invoke('connect', { deviceId: deviceId });
 		alert('Connecting');
 
-        await res;
-        isConnectionInProgress = false;
+		await res;
+		isConnectionInProgress = false;
 		connected = true;
 	}
 
@@ -63,7 +63,7 @@
 	<input
 		id="device-id"
 		type="text"
-        placeholder="Device ID"
+		placeholder="Device ID"
 		autocorrect="off"
 		autocomplete="off"
 		spellcheck="false"

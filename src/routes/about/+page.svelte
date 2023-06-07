@@ -8,6 +8,6 @@
 
 	<p>
 		Polar Tracker allows you to connect to your polar-h10 device, record your data into csv files
-        and also see live reports of your data.
+		and also see live reports of your data.
 	</p>
 </div>

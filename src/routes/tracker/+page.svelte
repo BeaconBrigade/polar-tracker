@@ -8,10 +8,10 @@
 		e.preventDefault();
 
 		setConfig($formConfig);
-        let temp = $formConfig;
-        temp.rate = +$formConfig.rate;
-        temp.range = +$formConfig.range;
-        console.log(JSON.stringify(temp, null, 2));
+		let temp = $formConfig;
+		temp.rate = +$formConfig.rate;
+		temp.range = +$formConfig.range;
+		console.log(JSON.stringify(temp, null, 2));
 		await invoke('set_config', { config: temp });
 		clearForm();
 		$pageState = 'connect';
@@ -79,7 +79,7 @@
 		margin: 10px;
 		padding: 20px;
 		align-items: center;
-        border-radius: 10px;
+		border-radius: 10px;
 	}
 
 	input,

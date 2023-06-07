@@ -4,13 +4,9 @@
 </svelte:head>
 
 <section>
-	<h1>
-		Polar Tracker
-	</h1>
+	<h1>Polar Tracker</h1>
 
-	<h2>
-		Connect and record data from your Polar H10 device.
-	</h2>
+	<h2>Connect and record data from your Polar H10 device.</h2>
 </section>
 
 <style>
