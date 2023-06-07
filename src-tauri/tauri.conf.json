@@ -13,7 +13,7 @@
 		"allowlist": {
 			"all": false,
 			"dialog": { "all": true },
-            "fs": { "all": true, "scope": ["$APPDATA"] }
+			"fs": { "all": true, "scope": ["$APPDATA"] }
 		},
 		"bundle": {
 			"active": true,
@@ -40,12 +40,15 @@
 				"signingIdentity": null
 			},
 			"resources": [],
-			"shortDescription": "",
+			"shortDescription": "Record Polar H10 data",
 			"targets": "all",
 			"windows": {
 				"certificateThumbprint": null,
 				"digestAlgorithm": "sha256",
-				"timestampUrl": ""
+				"timestampUrl": "",
+				"wix": {
+					"template": "main.wxs"
+				}
 			}
 		},
 		"security": {
