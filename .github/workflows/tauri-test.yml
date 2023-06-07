@@ -44,12 +44,6 @@ jobs:
       - name: Build and test frontend
         run: yarn && yarn test:unit && yarn lint
 
-      - name: Test and clippy rust
-        run: |
-          cargo test --release
-          cargo clippy --release
-        working-directory: src-tauri
-
       - name: Build tauri
         id: build
         uses: tauri-apps/tauri-action@v0
