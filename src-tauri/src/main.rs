@@ -55,19 +55,19 @@ fn main() {
                                     return;
                                 };
                                 p
-                            },
+                            }
                             "ecg" => {
                                 let Some(p) = ECG_PATH.lock().unwrap().clone() else {
                                     return;
                                 };
                                 p
-                            },
+                            }
                             "hr" => {
                                 let Some(p) = HR_PATH.lock().unwrap().clone() else {
                                     return;
                                 };
                                 p
-                            },
+                            }
                             _ => unreachable!(),
                         };
 
