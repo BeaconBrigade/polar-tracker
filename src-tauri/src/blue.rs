@@ -40,6 +40,10 @@ impl Handler {
             .unwrap()
             .as_secs()
             .to_string();
+        {
+            let mut lock = crate::PREFIX.lock().unwrap();
+            *lock = Some(prefix_path.clone());
+        }
         tracing::info!(
             "saving data to {}",
             path_resolver.app_data_dir().unwrap().to_string_lossy(),
@@ -138,10 +142,19 @@ fn path(base: PathBuf, prefix: &str, ty: EventType) -> PathBuf {
 impl EventHandler for Handler {
     async fn heart_rate_update(&self, heartrate: HeartRate) {
         tracing::trace!(bpm=heartrate.bpm(), rr=?heartrate.rr());
-        let mut rr = String::new();
-        for r in heartrate.rr().into_iter().flatten() {
-            rr.push_str(format!(",{}", r).as_str());
-        }
+        let mut rrs = heartrate
+            .rr()
+            .as_ref()
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+            .iter()
+            .map(|n| n.to_string());
+        let rr = format!(
+            ",{},{},{}",
+            rrs.next().unwrap_or_else(String::new),
+            rrs.next().unwrap_or_else(String::new),
+            rrs.next().unwrap_or_else(String::new)
+        );
         let count = self.hr_count.fetch_add(1, Ordering::AcqRel);
         self.hr_writer
             .lock()
@@ -211,12 +224,14 @@ pub struct Config {
 
 async fn write_metadata(config: &Config, file: &mut File) -> Result<(), io::Error> {
     let metadata = format!(
-        "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\"\n",
+        "Participant ID: \"{}\" | Session: {} | Trial: {} | Acc Range: {} g | Acc Rate: {} Hz | Time: {}\nDescription: \"{}\"\n",
         config.participant_id,
         config.session_number,
         config.trial_id,
+        config.range,
+        config.rate,
         Utc::now(),
-        config.description
+        config.description,
     );
 
     file.write_all(metadata.as_bytes()).await?;
@@ -226,7 +241,7 @@ async fn write_metadata(config: &Config, file: &mut File) -> Result<(), io::Erro
 
 async fn write_headers(ty: EventType, file: &mut File) -> Result<(), io::Error> {
     let header = match ty {
-        EventType::Hr => "time,bpm,rr\n",
+        EventType::Hr => "time,bpm,rr1,rr2,rr3\n",
         EventType::Acc => "time,x,y,z\n",
         EventType::Ecg => "time,val\n",
         EventType::Battery => unreachable!(),

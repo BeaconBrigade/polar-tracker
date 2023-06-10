@@ -24,6 +24,7 @@ tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 tokio = { version = "1.27.0", features = ["sync", "time"] }
 chrono = "0.4.24"
+futures = "0.3"
 
 [features]
 # by default Tauri runs in production mode

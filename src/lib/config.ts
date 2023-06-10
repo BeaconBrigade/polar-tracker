@@ -20,3 +20,7 @@ export function clearConfig() {
 }
 
 export const pageState = writable<'form' | 'connect' | 'sensor'>('form');
+
+export const connected = writable<boolean>(false);
+
+export const deviceID = writable<string>('');

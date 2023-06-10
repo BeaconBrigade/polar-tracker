@@ -1,12 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { clearConfig, config, pageState } from '$lib/config';
+	import { clearConfig, config, pageState, connected, deviceID } from '$lib/config';
 	import { invoke } from '@tauri-apps/api/tauri';
 
-	let deviceId = '';
-	let connected = false;
 	let isConnectionInProgress = false;
-	$: unsavedData = deviceId !== '';
+	$: unsavedData = $deviceID !== '' || $connected;
 
 	async function goBack() {
 		if (unsavedData) {
@@ -15,15 +13,16 @@
 			}
 			clearConfig();
 		}
-		if (connected) {
-			await disconnect();
+		if ($connected) {
+			await invoke('disconnect');
+			$connected = false;
 		}
 		$pageState = 'form';
 		await goto('/tracker');
 	}
 
 	async function next() {
-		if (connected) {
+		if ($connected) {
 			$pageState = 'sensor';
 			await goto('/sensor');
 		}
@@ -32,12 +31,17 @@
 	async function connect() {
 		// don't block on future until updating ui state
 		isConnectionInProgress = true;
-		let res = invoke('connect', { deviceId: deviceId });
-		alert('Connecting');
+		try {
+			let res = invoke('connect', { deviceId: $deviceID });
+			alert('Connecting');
+			await res;
+		} catch (e) {
+			console.error(e);
+			return;
+		}
 
-		await res;
 		isConnectionInProgress = false;
-		connected = true;
+		$connected = true;
 	}
 
 	async function disconnect() {
@@ -45,8 +49,13 @@
 		if (!ans) {
 			return;
 		}
-		console.log('hey!!');
-		connected = false;
+		await invoke('disconnect');
+		$connected = false;
+	}
+
+	async function cancel() {
+		await invoke('cancel');
+		isConnectionInProgress = false;
 	}
 </script>
 
@@ -67,15 +76,17 @@
 		autocorrect="off"
 		autocomplete="off"
 		spellcheck="false"
-		bind:value={deviceId}
+		bind:value={$deviceID}
 	/>
 
 	<pre>{JSON.stringify($config, null, 2)}</pre>
 
-	{#if connected}
+	{#if $connected}
 		<button on:click={disconnect}>Disconnect</button>
+	{:else if isConnectionInProgress}
+		<button on:click={cancel}>Cancel</button>
 	{:else}
-		<button on:click={connect} disabled={isConnectionInProgress}>Connect</button>
+		<button on:click={connect}>Connect</button>
 	{/if}
-	<button on:click={next} disabled={!connected}>Next</button>
+	<button on:click={next} disabled={!$connected}>Next</button>
 </div>

@@ -5,6 +5,7 @@
 
 	let unsavedData = false;
 	let measuring = false;
+	let hasMeasured = false;
 
 	async function goBack() {
 		if (unsavedData) {
@@ -18,6 +19,7 @@
 
 	async function start() {
 		measuring = true;
+		hasMeasured = true;
 		try {
 			await invoke('start_event_loop');
 		} catch (e) {
@@ -45,6 +47,6 @@
 
 	<p>Head to <b>polar-tracker → File → Export</b> to save your data.</p>
 
-	<button on:click={start} disabled={measuring}>Start Measurement</button>
+	<button on:click={start} disabled={measuring || hasMeasured}>Start Measurement</button>
 	<button on:click={stop} disabled={!measuring}>Stop Measurement</button>
 </div>

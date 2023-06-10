@@ -25,7 +25,7 @@
 </svelte:head>
 
 <div class="text-column">
-	<h1>Tracker Information</h1>
+	<h1>Metadata</h1>
 
 	<form on:submit={handleSubmit}>
 		<fieldset>
@@ -51,19 +51,19 @@
 		<fieldset>
 			<label for="range">Select range to measure acceleration</label>
 			<select id="range" bind:value={$formConfig.range}>
-				<option value="8">8 Gs</option>
-				<option value="4">4 Gs</option>
-				<option value="2">2 Gs</option>
+				<option value="8">8 g</option>
+				<option value="4">4 g</option>
+				<option value="2">2 g</option>
 			</select>
 		</fieldset>
 
 		<fieldset>
 			<label for="rate">Select sample rate for acceleration</label>
 			<select id="rate" bind:value={$formConfig.rate}>
-				<option value="200">200 hz</option>
-				<option value="100">100 hz</option>
-				<option value="50">50 hz</option>
-				<option value="25">25 hz</option>
+				<option value="200">200 Hz</option>
+				<option value="100">100 Hz</option>
+				<option value="50">50 Hz</option>
+				<option value="25">25 Hz</option>
 			</select>
 		</fieldset>
 
